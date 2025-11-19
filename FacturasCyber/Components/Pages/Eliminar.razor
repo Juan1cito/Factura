@@ -1,0 +1,226 @@
+﻿@page "/eliminar"
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using FacturasCyber.Models
+
+<PageTitle>Eliminar Factura</PageTitle>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-error" : "alert-success")">
+        @mensaje
+    </div>
+}
+
+<div class="form-section">
+    <h2>🗑️ Eliminar Factura</h2>
+
+    <div class="search-container">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Buscar por NIT o Cédula:</label>
+            <input type="text"
+                   @bind="nitCedula"
+                   placeholder="Ingrese NIT o Cédula"
+                   @onkeypress="HandleKeyPress" />
+        </div>
+        <button @onclick="BuscarFacturas" disabled="@buscando" style="align-self: flex-end;">
+            @if (buscando)
+            {
+                <span>🔍 Buscando...</span>
+            }
+            else
+            {
+                <span>🔍 Buscar</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (facturasEncontradas.Any())
+{
+    <div class="facturas-lista">
+        <h2 style="color: #c41e3a; margin-bottom: 20px;">Facturas Encontradas</h2>
+        <p style="color: #666; margin-bottom: 15px;">Seleccione una factura y haga clic en el icono de basura para eliminarla:</p>
+
+        @foreach (var factura in facturasEncontradas)
+        {
+            <div class="factura-item @(facturaSeleccionada?.Id == factura.Id ? "selected" : "")"
+                 @onclick="() => SeleccionarFactura(factura)">
+
+                <button class="btn-delete-factura"
+                        @onclick="() => ConfirmarEliminacion(factura)"
+                        @onclick:stopPropagation="true">
+                    🗑️
+                </button>
+
+                <strong style="color: #c41e3a;">@factura.NumeroFactura</strong> - @factura.Cliente
+                <span style="float: right; color: #ff6b35; font-weight: bold; margin-right: 50px;">
+                    $@factura.Total.ToString("N2")
+                </span>
+                <br>
+                <small style="color: #999;">
+                    NIT: @(factura.NIT ?? "N/A") | @factura.Fecha.ToString("dd/MM/yyyy HH:mm")
+                </small>
+            </div>
+        }
+    </div>
+}
+else if (!string.IsNullOrEmpty(nitCedula) && !buscando)
+{
+    <div class="alert alert-info">
+        ℹ️ No se encontraron facturas con ese NIT o Cédula
+    </div>
+}
+
+@if (mostrarConfirmacion && facturaAEliminar != null)
+{
+    <div class="form-section" style="background: #fff5f5; border: 2px solid #c41e3a;">
+        <h3 style="color: #c41e3a;">⚠️ Confirmar Eliminación</h3>
+        <p>¿Está seguro que desea eliminar esta factura?</p>
+
+        <div style="background: white; padding: 15px; margin: 15px 0; border-radius: 5px;">
+            <p><strong>Número:</strong> @facturaAEliminar.NumeroFactura</p>
+            <p><strong>Cliente:</strong> @facturaAEliminar.Cliente</p>
+            <p><strong>Total:</strong> $@facturaAEliminar.Total.ToString("N2")</p>
+        </div>
+
+        <button class="btn-danger" @onclick="EliminarFactura" disabled="@eliminando">
+            @if (eliminando)
+            {
+                <span>⏳ Eliminando...</span>
+            }
+            else
+            {
+                <span>🗑️ Sí, Eliminar</span>
+            }
+        </button>
+        <button @onclick="CancelarEliminacion" style="background: #999; margin-left: 10px;">
+            ❌ Cancelar
+        </button>
+    </div>
+}
+
+@code {
+    private string nitCedula = "";
+    private bool buscando = false;
+    private bool eliminando = false;
+    private bool mostrarConfirmacion = false;
+    private string mensaje = "";
+    private bool esError = false;
+
+    private List<Factura> facturasEncontradas = new();
+    private Factura? facturaSeleccionada = null;
+    private Factura? facturaAEliminar = null;
+
+    private async Task BuscarFacturas()
+    {
+        mensaje = "";
+
+        if (string.IsNullOrWhiteSpace(nitCedula))
+        {
+            mensaje = "⚠️ Ingrese un NIT o Cédula para buscar";
+            esError = true;
+            return;
+        }
+
+        buscando = true;
+        facturasEncontradas.Clear();
+        facturaSeleccionada = null;
+        mostrarConfirmacion = false;
+
+        try
+        {
+            // Buscar todas las facturas
+            var response = await Http.GetAsync("/api/facturas");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var todasFacturas = await response.Content.ReadFromJsonAsync<List<Factura>>();
+
+                // Filtrar por NIT o Cédula
+                facturasEncontradas = todasFacturas?
+                    .Where(f => !string.IsNullOrEmpty(f.NIT) && f.NIT.Contains(nitCedula, StringComparison.OrdinalIgnoreCase))
+                    .ToList() ?? new List<Factura>();
+            }
+            else
+            {
+                mensaje = $"❌ Error al buscar facturas: {response.StatusCode}";
+                esError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error: {ex.Message}";
+            esError = true;
+        }
+        finally
+        {
+            buscando = false;
+        }
+    }
+
+    private void SeleccionarFactura(Factura factura)
+    {
+        facturaSeleccionada = factura;
+    }
+
+    private void ConfirmarEliminacion(Factura factura)
+    {
+        facturaAEliminar = factura;
+        mostrarConfirmacion = true;
+        mensaje = "";
+    }
+
+    private async Task EliminarFactura()
+    {
+        if (facturaAEliminar == null) return;
+
+        eliminando = true;
+        mensaje = "";
+
+        try
+        {
+            var response = await Http.DeleteAsync($"/api/facturas/{facturaAEliminar.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                mensaje = $"✅ Factura {facturaAEliminar.NumeroFactura} eliminada exitosamente!";
+                esError = false;
+
+                facturasEncontradas.Remove(facturaAEliminar);
+                facturaAEliminar = null;
+                mostrarConfirmacion = false;
+                facturaSeleccionada = null;
+            }
+            else
+            {
+                mensaje = $"❌ Error al eliminar: {response.StatusCode}";
+                esError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error: {ex.Message}";
+            esError = true;
+        }
+        finally
+        {
+            eliminando = false;
+        }
+    }
+
+    private void CancelarEliminacion()
+    {
+        mostrarConfirmacion = false;
+        facturaAEliminar = null;
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !buscando)
+        {
+            await BuscarFacturas();
+        }
+    }
+}

@@ -1,0 +1,354 @@
+﻿@page "/editar"
+@inject HttpClient Http
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using FacturasCyber.Models
+
+<PageTitle>Editar Factura</PageTitle>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-error" : "alert-success")">
+        @mensaje
+        @if (!string.IsNullOrEmpty(errorDetalle))
+        {
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer;">Ver detalles del error</summary>
+                <pre style="background: #f8d7da; padding: 10px; margin-top: 10px; font-size: 0.85em; white-space: pre-wrap;">@errorDetalle</pre>
+            </details>
+        }
+    </div>
+}
+
+<div class="form-section">
+    <h2>✏️ Editar Factura</h2>
+
+    <div class="search-container">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Buscar por ID o NIT:</label>
+            <input type="text"
+                   @bind="criterio"
+                   placeholder="Ingrese ID o NIT"
+                   @onkeypress="HandleKeyPress" />
+        </div>
+        <button @onclick="BuscarFactura" disabled="@buscando" style="align-self: flex-end;">
+            @if (buscando)
+            {
+                <span>🔍 Buscando...</span>
+            }
+            else
+            {
+                <span>🔍 Buscar</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (facturaEncontrada != null && !modoEdicion)
+{
+    <div class="form-section">
+        <h3 style="color: #c41e3a;">Factura Encontrada</h3>
+
+        <div class="tiquete-info">
+            <div class="tiquete-info-row">
+                <span class="tiquete-info-label">Número:</span>
+                <span>@facturaEncontrada.NumeroFactura</span>
+            </div>
+            <div class="tiquete-info-row">
+                <span class="tiquete-info-label">Cliente:</span>
+                <span>@facturaEncontrada.Cliente</span>
+            </div>
+            <div class="tiquete-info-row">
+                <span class="tiquete-info-label">NIT:</span>
+                <span>@(facturaEncontrada.NIT ?? "N/A")</span>
+            </div>
+            <div class="tiquete-info-row">
+                <span class="tiquete-info-label">Total:</span>
+                <span style="color: #c41e3a; font-weight: bold;">$@facturaEncontrada.Total.ToString("N2")</span>
+            </div>
+        </div>
+
+        <button @onclick="IniciarEdicion">✏️ Editar esta Factura</button>
+    </div>
+}
+
+@if (modoEdicion && facturaEditando != null)
+{
+    <div class="form-section">
+        <h2>📝 Editando Factura: @facturaEditando.NumeroFactura</h2>
+
+        <div class="form-group">
+            <label>Cliente:</label>
+            <input type="text" @bind="facturaEditando.Cliente" />
+        </div>
+
+        <div class="form-group">
+            <label>NIT/Cédula:</label>
+            <input type="text" @bind="facturaEditando.NIT" />
+        </div>
+
+        <div class="form-group">
+            <label>Dirección:</label>
+            <input type="text" @bind="facturaEditando.Direccion" />
+        </div>
+
+        <h3 style="color: #ff6b35; margin: 20px 0 10px 0;">Productos</h3>
+
+        @foreach (var (detalle, index) in detallesEditando.Select((d, i) => (d, i)))
+        {
+            <div class="detalles-producto">
+                <div class="producto-header">
+                    <input type="text"
+                           placeholder="Producto"
+                           @bind="detalle.Producto" />
+                    <input type="number"
+                           placeholder="Cantidad"
+                           @bind="detalle.Cantidad"
+                           min="1" />
+                    <input type="number"
+                           placeholder="Precio"
+                           @bind="detalle.PrecioUnitario"
+                           step="0.01"
+                           min="0" />
+                    <button @onclick="() => EliminarProductoEdicion(detalle)"
+                            style="background: #c41e3a; padding: 10px 15px;">
+                        ✕
+                    </button>
+                </div>
+            </div>
+        }
+
+        <button @onclick="AgregarProductoEdicion">+ Agregar Producto</button>
+        <button class="btn-secondary" @onclick="GuardarCambios" disabled="@guardando">
+            @if (guardando)
+            {
+                <span>⏳ Guardando...</span>
+            }
+            else
+            {
+                <span>💾 Guardar Cambios</span>
+            }
+        </button>
+        <button @onclick="CancelarEdicion" style="background: #999;">❌ Cancelar</button>
+    </div>
+}
+
+@code {
+    private string criterio = "";
+    private bool buscando = false;
+    private bool guardando = false;
+    private bool modoEdicion = false;
+    private string mensaje = "";
+    private bool esError = false;
+    private string errorDetalle = "";
+
+    private Factura? facturaEncontrada = null;
+    private Factura? facturaEditando = null;
+    private List<DetalleFacturaDTO> detallesEditando = new();
+
+    private async Task BuscarFactura()
+    {
+        mensaje = "";
+        errorDetalle = "";
+
+        if (string.IsNullOrWhiteSpace(criterio))
+        {
+            mensaje = "⚠️ Ingrese un ID o NIT para buscar";
+            esError = true;
+            return;
+        }
+
+        buscando = true;
+        facturaEncontrada = null;
+        modoEdicion = false;
+
+        try
+        {
+            Console.WriteLine($"🔍 Buscando factura con criterio: {criterio}");
+            Console.WriteLine($"🔗 URL Base: {Http.BaseAddress}");
+
+            // Intentar buscar por ID
+            if (int.TryParse(criterio, out int id))
+            {
+                Console.WriteLine($"📍 Buscando por ID: {id}");
+                var response = await Http.GetAsync($"/api/facturas/{id}");
+                Console.WriteLine($"📡 Respuesta ID: {response.StatusCode}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    facturaEncontrada = await response.Content.ReadFromJsonAsync<Factura>();
+                    Console.WriteLine($"✅ Factura encontrada por ID");
+                }
+            }
+
+            // Si no se encontró por ID, buscar por NIT
+            if (facturaEncontrada == null)
+            {
+                Console.WriteLine($"📍 Buscando por NIT/Cliente: {criterio}");
+                var response = await Http.GetAsync($"/api/facturas/buscar?cliente={criterio}");
+                Console.WriteLine($"📡 Respuesta búsqueda: {response.StatusCode}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var facturas = await response.Content.ReadFromJsonAsync<List<Factura>>();
+                    facturaEncontrada = facturas?.FirstOrDefault(f => f.NIT == criterio);
+
+                    if (facturaEncontrada != null)
+                    {
+                        Console.WriteLine($"✅ Factura encontrada por NIT");
+                    }
+                }
+            }
+
+            if (facturaEncontrada == null)
+            {
+                mensaje = "❌ No se encontró ninguna factura con ese criterio";
+                errorDetalle = $"Criterio buscado: {criterio}\n" +
+                              $"Intentó buscar por ID: {int.TryParse(criterio, out _)}\n" +
+                              $"URL del servidor: {Http.BaseAddress}";
+                esError = true;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            mensaje = "❌ Error de conexión. Verifique que la API esté ejecutándose.";
+            errorDetalle = $"Error HTTP:\n{ex.Message}\n\nURL: {Http.BaseAddress}";
+            esError = true;
+            Console.WriteLine($"❌ HttpRequestException: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error inesperado: {ex.Message}";
+            errorDetalle = $"Tipo: {ex.GetType().Name}\n{ex.StackTrace}";
+            esError = true;
+            Console.WriteLine($"❌ Exception: {ex}");
+        }
+        finally
+        {
+            buscando = false;
+        }
+    }
+
+    private void IniciarEdicion()
+    {
+        if (facturaEncontrada != null)
+        {
+            facturaEditando = new Factura
+            {
+                Id = facturaEncontrada.Id,
+                NumeroFactura = facturaEncontrada.NumeroFactura,
+                Cliente = facturaEncontrada.Cliente,
+                NIT = facturaEncontrada.NIT,
+                Direccion = facturaEncontrada.Direccion
+            };
+
+            detallesEditando = facturaEncontrada.Detalles.Select(d => new DetalleFacturaDTO
+            {
+                Producto = d.Producto,
+                Cantidad = d.Cantidad,
+                PrecioUnitario = d.PrecioUnitario
+            }).ToList();
+
+            modoEdicion = true;
+        }
+    }
+
+    private void AgregarProductoEdicion()
+    {
+        detallesEditando.Add(new DetalleFacturaDTO());
+    }
+
+    private void EliminarProductoEdicion(DetalleFacturaDTO detalle)
+    {
+        if (detallesEditando.Count > 1)
+        {
+            detallesEditando.Remove(detalle);
+        }
+    }
+
+    private async Task GuardarCambios()
+    {
+        mensaje = "";
+        errorDetalle = "";
+
+        if (facturaEditando == null || detallesEditando.Count == 0)
+        {
+            mensaje = "⚠️ Complete todos los campos";
+            esError = true;
+            return;
+        }
+
+        if (detallesEditando.Any(d => string.IsNullOrWhiteSpace(d.Producto) || d.Cantidad <= 0 || d.PrecioUnitario <= 0))
+        {
+            mensaje = "⚠️ Complete todos los datos de los productos";
+            esError = true;
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            var facturaDTO = new CrearFacturaDTO
+            {
+                Cliente = facturaEditando.Cliente,
+                NIT = facturaEditando.NIT,
+                Direccion = facturaEditando.Direccion,
+                Detalles = detallesEditando
+            };
+
+            Console.WriteLine($"📤 Actualizando factura ID: {facturaEditando.Id}");
+            var response = await Http.PutAsJsonAsync($"/api/facturas/{facturaEditando.Id}", facturaDTO);
+            Console.WriteLine($"📡 Respuesta: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                mensaje = "✅ ¡Factura actualizada exitosamente!";
+                esError = false;
+                modoEdicion = false;
+                facturaEncontrada = null;
+                criterio = "";
+
+                await JS.InvokeVoidAsync("alert", "✅ Factura actualizada exitosamente!");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                mensaje = $"❌ Error al actualizar: {response.StatusCode}";
+                errorDetalle = $"Detalles: {errorContent}";
+                esError = true;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            mensaje = "❌ Error de conexión con el servidor";
+            errorDetalle = $"Error HTTP: {ex.Message}";
+            esError = true;
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error: {ex.Message}";
+            errorDetalle = ex.StackTrace ?? "";
+            esError = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void CancelarEdicion()
+    {
+        modoEdicion = false;
+        facturaEditando = null;
+        detallesEditando.Clear();
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !buscando)
+        {
+            await BuscarFactura();
+        }
+    }
+}

@@ -1,0 +1,551 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Facturas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: #ff6b35;
+            margin-bottom: 30px;
+        }
+
+            .header h1 {
+                font-size: 2.5em;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            }
+
+        .api-config {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff6b35;
+        }
+
+            .api-config input {
+                width: 100%;
+                padding: 8px;
+                border: 2px solid #ff6b35;
+                border-radius: 5px;
+            }
+
+        .form-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #c41e3a;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ff6b35;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            background: linear-gradient(135deg, #c41e3a 0%, #ff6b35 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+
+            button:hover {
+                transform: scale(1.05);
+            }
+
+            button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #ff6b35 0%, #ffa500 100%);
+            margin-left: 10px;
+        }
+
+        .tiquete {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 20px;
+            padding: 0;
+            box-shadow: 0 15px 40px rgba(196, 30, 58, 0.4);
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .tiquete-header {
+            background: linear-gradient(135deg, #c41e3a 0%, #ff6b35 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px dashed white;
+        }
+
+            .tiquete-header h2 {
+                font-size: 1.8em;
+                margin-bottom: 5px;
+            }
+
+            .tiquete-header p {
+                font-size: 0.9em;
+                opacity: 0.9;
+            }
+
+        .tiquete-body {
+            padding: 20px;
+            background: white;
+        }
+
+        .tiquete-info {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #ccc;
+        }
+
+        .tiquete-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .tiquete-info-label {
+            color: #c41e3a;
+            font-weight: bold;
+        }
+
+        .tiquete-items {
+            margin: 20px 0;
+        }
+
+        .tiquete-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .item-name {
+            flex: 2;
+            color: #333;
+        }
+
+        .item-qty {
+            flex: 0.5;
+            text-align: center;
+            color: #ff6b35;
+            font-weight: bold;
+        }
+
+        .item-price {
+            flex: 1;
+            text-align: right;
+            color: #333;
+        }
+
+        .tiquete-totales {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #c41e3a;
+        }
+
+        .tiquete-total-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 1em;
+        }
+
+            .tiquete-total-row.total {
+                font-size: 1.3em;
+                color: #c41e3a;
+                font-weight: bold;
+                border-top: 2px solid #c41e3a;
+                padding-top: 10px;
+                margin-top: 10px;
+            }
+
+        .tiquete-footer {
+            background: linear-gradient(135deg, #ff6b35 0%, #ffa500 100%);
+            padding: 15px;
+            text-align: center;
+            color: white;
+            font-size: 0.85em;
+            border-top: 3px dashed white;
+        }
+
+        .facturas-lista {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
+        }
+
+        .factura-item {
+            padding: 15px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            border-left: 4px solid #ff6b35;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+            .factura-item:hover {
+                background: #fff5f2;
+                transform: translateX(5px);
+            }
+
+        .detalles-producto {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #ff6b35;
+        }
+
+        .producto-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+            .producto-header input {
+                flex: 2;
+            }
+
+                .producto-header input[type="number"] {
+                    flex: 1;
+                }
+
+        .loading {
+            color: #ff6b35;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #c41e3a;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #c41e3a;
+        }
+
+        .success {
+            background: #e0ffe0;
+            color: #2d8b2d;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #2d8b2d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧾 Sistema de Facturas</h1>
+            <p>Gestión de Facturas con API Backend</p>
+        </div>
+
+        <div class="api-config">
+            <label>🔗 URL de la API:</label>
+            <input type="text" id="apiUrl" value="http://localhost:5294/api/facturas" placeholder="http://localhost:5294/api/facturas">
+            <small style="color: #666; display: block; margin-top: 5px;">Cambia el puerto según tu configuración</small>
+        </div>
+
+        <div id="messages"></div>
+
+        <div class="form-section">
+            <h2 style="color: #c41e3a; margin-bottom: 20px;">📝 Nueva Factura</h2>
+
+            <div class="form-group">
+                <label>Cliente:</label>
+                <input type="text" id="cliente" placeholder="Nombre del cliente">
+            </div>
+
+            <div class="form-group">
+                <label>NIT/Cédula:</label>
+                <input type="text" id="nit" placeholder="Número de identificación">
+            </div>
+
+            <div class="form-group">
+                <label>Dirección:</label>
+                <input type="text" id="direccion" placeholder="Dirección del cliente">
+            </div>
+
+            <h3 style="color: #ff6b35; margin: 20px 0 10px 0;">Productos</h3>
+            <div id="productos-container"></div>
+
+            <button onclick="agregarProducto()">+ Agregar Producto</button>
+            <button class="btn-secondary" onclick="crearFactura()" id="btnCrear">💾 Crear Factura</button>
+        </div>
+
+        <div id="tiquete-preview"></div>
+
+        <div class="facturas-lista">
+            <h2 style="color: #c41e3a; margin-bottom: 20px;">📋 Facturas en Base de Datos</h2>
+            <button onclick="cargarFacturas()" style="margin-bottom: 15px;">🔄 Recargar Facturas</button>
+            <div id="facturas-container">
+                <p class="loading">Cargando facturas...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let productos = [];
+        const API_URL = () => document.getElementById('apiUrl').value;
+
+        function mostrarMensaje(texto, tipo = 'success') {
+            const div = document.createElement('div');
+            div.className = tipo;
+            div.textContent = texto;
+            document.getElementById('messages').appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        function agregarProducto() {
+            const id = Date.now();
+            productos.push({ id, nombre: '', cantidad: 1, precio: 0 });
+            renderizarProductos();
+        }
+
+        function eliminarProducto(id) {
+            productos = productos.filter(p => p.id !== id);
+            renderizarProductos();
+        }
+
+        function renderizarProductos() {
+            const container = document.getElementById('productos-container');
+            container.innerHTML = productos.map((p, index) => `
+                    <div class="detalles-producto">
+                        <div class="producto-header">
+                            <input type="text" placeholder="Producto"
+                                   value="${p.nombre}"
+                                   onchange="productos[${index}].nombre = this.value">
+                            <input type="number" placeholder="Cant"
+                                   value="${p.cantidad}" min="1"
+                                   onchange="productos[${index}].cantidad = parseInt(this.value)">
+                            <input type="number" placeholder="Precio"
+                                   value="${p.precio}" min="0" step="0.01"
+                                   onchange="productos[${index}].precio = parseFloat(this.value)">
+                            <button onclick="eliminarProducto(${p.id})"
+                                    style="background: #c41e3a; padding: 10px 15px;">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        async function crearFactura() {
+            const cliente = document.getElementById('cliente').value;
+            const nit = document.getElementById('nit').value;
+            const direccion = document.getElementById('direccion').value;
+
+            if (!cliente || productos.length === 0) {
+                mostrarMensaje('⚠️ Complete todos los campos y agregue al menos un producto', 'error');
+                return;
+            }
+
+            if (productos.some(p => !p.nombre || p.cantidad <= 0 || p.precio <= 0)) {
+                mostrarMensaje('⚠️ Complete todos los datos de los productos', 'error');
+                return;
+            }
+
+            const btnCrear = document.getElementById('btnCrear');
+            btnCrear.disabled = true;
+            btnCrear.textContent = '⏳ Guardando...';
+
+            const facturaDTO = {
+                cliente,
+                nit,
+                direccion,
+                detalles: productos.map(p => ({
+                    producto: p.nombre,
+                    cantidad: p.cantidad,
+                    precioUnitario: p.precio
+                }))
+            };
+
+            try {
+                const response = await fetch(API_URL(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(facturaDTO)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+
+                const factura = await response.json();
+                mostrarMensaje('✅ Factura creada exitosamente!', 'success');
+                mostrarTiquete(factura);
+                limpiarFormulario();
+                cargarFacturas();
+            } catch (error) {
+                mostrarMensaje(`❌ Error al crear factura: ${error.message}`, 'error');
+                console.error('Error:', error);
+            } finally {
+                btnCrear.disabled = false;
+                btnCrear.textContent = '💾 Crear Factura';
+            }
+        }
+
+        async function cargarFacturas() {
+            const container = document.getElementById('facturas-container');
+            container.innerHTML = '<p class="loading">Cargando facturas...</p>';
+
+            try {
+                const response = await fetch(API_URL());
+
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}`);
+                }
+
+                const facturas = await response.json();
+
+                if (facturas.length === 0) {
+                    container.innerHTML = '<p style="color: #999; text-align: center;">No hay facturas en la base de datos</p>';
+                    return;
+                }
+
+                container.innerHTML = facturas.map(f => `
+                        <div class="factura-item" onclick='mostrarTiquete(${JSON.stringify(f).replace(/'/g, "\\'")})'>
+                            <strong style="color: #c41e3a;">${f.numeroFactura}</strong> - ${f.cliente}
+                            <span style="float: right; color: #ff6b35; font-weight: bold;">
+                                $${f.total.toLocaleString('es-CO', { minimumFractionDigits: 2 })}
+                            </span>
+                            <br>
+                            <small style="color: #999;">${new Date(f.fecha).toLocaleString('es-CO')}</small>
+                        </div>
+                    `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="error">❌ Error al cargar facturas: ${error.message}<br><small>Verifica que la API esté ejecutándose</small></div>`;
+                console.error('Error:', error);
+            }
+        }
+
+        function mostrarTiquete(factura) {
+            const tiqueteHTML = `
+                    <div class="tiquete">
+                        <div class="tiquete-header">
+                            <h2>FACTURA</h2>
+                            <p>${factura.numeroFactura}</p>
+                        </div>
+                        <div class="tiquete-body">
+                            <div class="tiquete-info">
+                                <div class="tiquete-info-row">
+                                    <span class="tiquete-info-label">Fecha:</span>
+                                    <span>${new Date(factura.fecha).toLocaleString('es-CO')}</span>
+                                </div>
+                                <div class="tiquete-info-row">
+                                    <span class="tiquete-info-label">Cliente:</span>
+                                    <span>${factura.cliente}</span>
+                                </div>
+                                <div class="tiquete-info-row">
+                                    <span class="tiquete-info-label">NIT:</span>
+                                    <span>${factura.nit || 'N/A'}</span>
+                                </div>
+                                <div class="tiquete-info-row">
+                                    <span class="tiquete-info-label">Dirección:</span>
+                                    <span>${factura.direccion || 'N/A'}</span>
+                                </div>
+                            </div>
+
+                            <div class="tiquete-items">
+                                ${factura.detalles.map(d => `
+                                    <div class="tiquete-item">
+                                        <span class="item-name">${d.producto}</span>
+                                        <span class="item-qty">x${d.cantidad}</span>
+                                        <span class="item-price">$${d.subtotal.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="tiquete-totales">
+                                <div class="tiquete-total-row">
+                                    <span>Subtotal:</span>
+                                    <span>$${factura.subtotal.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div class="tiquete-total-row">
+                                    <span>IVA (19%):</span>
+                                    <span>$${factura.iva.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div class="tiquete-total-row total">
+                                    <span>TOTAL:</span>
+                                    <span>$${factura.total.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tiquete-footer">
+                            <p>¡Gracias por su compra!</p>
+                            <p>Este documento es válido como factura</p>
+                        </div>
+                    </div>
+                `;
+
+            document.getElementById('tiquete-preview').innerHTML = tiqueteHTML;
+            document.querySelector('.tiquete').style.display = 'block';
+            document.querySelector('.tiquete').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function limpiarFormulario() {
+            document.getElementById('cliente').value = '';
+            document.getElementById('nit').value = '';
+            document.getElementById('direccion').value = '';
+            productos = [];
+            renderizarProductos();
+        }
+
+        // Inicialización
+        agregarProducto();
+        cargarFacturas();
+    </script>
+</body>
+</html>

@@ -1,0 +1,223 @@
+﻿@page "/crear"
+@page "/"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject IJSRuntime JS
+@using System.Net.Http.Json
+@using FacturasCyber.Models
+
+<PageTitle>Crear Factura</PageTitle>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-error" : "alert-success")">
+        @mensaje
+        @if (!string.IsNullOrEmpty(errorDetalle))
+        {
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; color: #721c24;">Ver detalles del error</summary>
+                <pre style="background: #f8d7da; padding: 10px; margin-top: 10px; font-size: 0.85em; white-space: pre-wrap;">@errorDetalle</pre>
+            </details>
+        }
+    </div>
+}
+
+<div class="form-section">
+    <h2>📝 Nueva Factura</h2>
+
+    <div class="form-group">
+        <label>Cliente:</label>
+        <input type="text" @bind="nuevaFactura.Cliente" placeholder="Nombre del cliente" />
+    </div>
+
+    <div class="form-group">
+        <label>NIT/Cédula:</label>
+        <input type="text" @bind="nuevaFactura.NIT" placeholder="Número de identificación" />
+    </div>
+
+    <div class="form-group">
+        <label>Dirección:</label>
+        <input type="text" @bind="nuevaFactura.Direccion" placeholder="Dirección del cliente" />
+    </div>
+
+    <h3 style="color: #ff6b35; margin: 20px 0 10px 0;">Productos</h3>
+
+    @foreach (var (detalle, index) in nuevaFactura.Detalles.Select((d, i) => (d, i)))
+    {
+        <div class="detalles-producto">
+            <div class="producto-header">
+                <input type="text"
+                       placeholder="Producto"
+                       @bind="detalle.Producto" />
+                <input type="number"
+                       placeholder="Cantidad"
+                       @bind="detalle.Cantidad"
+                       min="1" />
+                <input type="number"
+                       placeholder="Precio"
+                       @bind="detalle.PrecioUnitario"
+                       step="0.01"
+                       min="0" />
+                <button @onclick="() => EliminarProducto(detalle)"
+                        style="background: #c41e3a; padding: 10px 15px;">
+                    ✕
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(detalle.Producto) && detalle.Cantidad > 0 && detalle.PrecioUnitario > 0)
+            {
+                <p style="text-align: right; color: #c41e3a; font-weight: bold; margin-top: 10px;">
+                    Subtotal: $@((detalle.Cantidad * detalle.PrecioUnitario).ToString("N2"))
+                </p>
+            }
+        </div>
+    }
+
+    <button @onclick="AgregarProducto">+ Agregar Producto</button>
+    <button class="btn-secondary" @onclick="CrearFactura" disabled="@guardando">
+        @if (guardando)
+        {
+            <span>⏳ Guardando...</span>
+        }
+        else
+        {
+            <span>💾 Crear Factura</span>
+        }
+    </button>
+</div>
+
+@if (facturaCreada != null)
+{
+    <div class="tiquete">
+        <div class="tiquete-header">
+            <h2>FACTURA</h2>
+            <p>@facturaCreada.NumeroFactura</p>
+        </div>
+        <div class="tiquete-body">
+            <div class="tiquete-info">
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Fecha:</span>
+                    <span>@facturaCreada.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Cliente:</span>
+                    <span>@facturaCreada.Cliente</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">NIT:</span>
+                    <span>@(facturaCreada.NIT ?? "N/A")</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Dirección:</span>
+                    <span>@(facturaCreada.Direccion ?? "N/A")</span>
+                </div>
+            </div>
+
+            <div class="tiquete-items">
+                @foreach (var detalle in facturaCreada.Detalles)
+                {
+                    <div class="tiquete-item">
+                        <span class="item-name">@detalle.Producto</span>
+                        <span class="item-qty">x@detalle.Cantidad</span>
+                        <span class="item-price">$@detalle.Subtotal.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+
+            <div class="tiquete-totales">
+                <div class="tiquete-total-row">
+                    <span>Subtotal:</span>
+                    <span>$@facturaCreada.Subtotal.ToString("N2")</span>
+                </div>
+                <div class="tiquete-total-row">
+                    <span>IVA (19%):</span>
+                    <span>$@facturaCreada.IVA.ToString("N2")</span>
+                </div>
+                <div class="tiquete-total-row total">
+                    <span>TOTAL:</span>
+                    <span>$@facturaCreada.Total.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+        <div class="tiquete-footer">
+            <p>¡Gracias por su compra!</p>
+            <p>Este documento es válido como factura</p>
+        </div>
+    </div>
+}
+
+@code {
+    private CrearFacturaDTO nuevaFactura = new();
+    private Factura? facturaCreada = null;
+    private bool guardando = false;
+    private string mensaje = "";
+    private bool esError = false;
+    private string errorDetalle = "";
+
+    protected override void OnInitialized()
+    {
+        AgregarProducto();
+    }
+
+    private void AgregarProducto()
+    {
+        nuevaFactura.Detalles.Add(new DetalleFacturaDTO());
+    }
+
+    private void EliminarProducto(DetalleFacturaDTO detalle)
+    {
+        if (nuevaFactura.Detalles.Count > 1)
+        {
+            nuevaFactura.Detalles.Remove(detalle);
+        }
+    }
+
+    private async Task CrearFactura()
+    {
+        mensaje = "";
+
+        if (string.IsNullOrWhiteSpace(nuevaFactura.Cliente) || nuevaFactura.Detalles.Count == 0)
+        {
+            mensaje = "⚠️ Complete todos los campos y agregue al menos un producto";
+            esError = true;
+            return;
+        }
+
+        if (nuevaFactura.Detalles.Any(d => string.IsNullOrWhiteSpace(d.Producto) || d.Cantidad <= 0 || d.PrecioUnitario <= 0))
+        {
+            mensaje = "⚠️ Complete todos los datos de los productos";
+            esError = true;
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/facturas", nuevaFactura);
+
+            if (response.IsSuccessStatusCode)
+            {
+                facturaCreada = await response.Content.ReadFromJsonAsync<Factura>();
+                mensaje = "✅ Factura creada exitosamente!";
+                esError = false;
+
+                // Limpiar formulario
+                nuevaFactura = new CrearFacturaDTO();
+                AgregarProducto();
+            }
+            else
+            {
+                mensaje = $"❌ Error al crear factura: {response.StatusCode}";
+                esError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error: {ex.Message}";
+            esError = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}

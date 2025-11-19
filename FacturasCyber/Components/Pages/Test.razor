@@ -1,0 +1,120 @@
+﻿@page "/test"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using FacturasCyber.Models
+
+<PageTitle>Test Interactividad</PageTitle>
+
+<div class="form-section">
+    <h2>🧪 Prueba de Interactividad Blazor</h2>
+
+    <h3>Prueba 1: Contador Simple</h3>
+    <p>Contador: <strong>@contador</strong></p>
+    <button @onclick="IncrementarContador">➕ Incrementar</button>
+    <p style="color: @(contador > 0 ? "green" : "red"); margin-top: 10px;">
+        @if (contador > 0)
+        {
+            <span>✅ Los botones SÍ funcionan!</span>
+        }
+        else
+        {
+            <span>❌ Los botones NO responden</span>
+        }
+    </p>
+
+    <hr />
+
+    <h3>Prueba 2: Input Binding</h3>
+    <input type="text" @bind="textoInput" placeholder="Escribe algo..." />
+    <p>Texto: <strong>@textoInput</strong></p>
+    <p style="color: @(string.IsNullOrEmpty(textoInput) ? "red" : "green");">
+        @if (!string.IsNullOrEmpty(textoInput))
+        {
+            <span>✅ El binding funciona!</span>
+        }
+        else
+        {
+            <span>❌ El binding no funciona</span>
+        }
+    </p>
+
+    <hr />
+
+    <h3>Prueba 3: Conexión con API</h3>
+    <p><strong>Base URL:</strong> @Http.BaseAddress</p>
+    <button @onclick="ProbarAPI">🔍 Probar Conexión API</button>
+
+    @if (!string.IsNullOrEmpty(resultadoAPI))
+    {
+        <pre style="background: #f5f5f5; padding: 15px; margin-top: 10px; border-radius: 5px;">@resultadoAPI</pre>
+    }
+
+    <hr />
+
+    <h3>📊 Diagnóstico:</h3>
+    <ul style="text-align: left; line-height: 2;">
+        <li>✅ Rendermode: InteractiveServer</li>
+        <li>✅ Página cargada correctamente</li>
+        <li>@(contador > 0 ? "✅" : "❌") Interactividad: @(contador > 0 ? "FUNCIONANDO" : "NO FUNCIONA")</li>
+        <li>@(!string.IsNullOrEmpty(textoInput) ? "✅" : "❌") Data Binding: @(!string.IsNullOrEmpty(textoInput) ? "FUNCIONANDO" : "NO FUNCIONA")</li>
+    </ul>
+
+    @if (contador == 0 && string.IsNullOrEmpty(textoInput))
+    {
+        <div class="alert alert-error">
+            <h4>❌ PROBLEMA DETECTADO:</h4>
+            <p>Los componentes Blazor NO están respondiendo a eventos.</p>
+            <p><strong>Soluciones:</strong></p>
+            <ol style="text-align: left;">
+                <li>Verifica que todas las páginas tengan: <code>@@rendermode InteractiveServer</code></li>
+                <li>Verifica que App.razor tenga: <code>&lt;Routes @@rendermode="InteractiveServer" /&gt;</code></li>
+                <li>Limpia y reconstruye: <code>dotnet clean && dotnet build</code></li>
+                <li>Reinicia ambos proyectos (API y Blazor)</li>
+            </ol>
+        </div>
+    }
+</div>
+
+@code {
+    private int contador = 0;
+    private string textoInput = "";
+    private string resultadoAPI = "";
+
+    private void IncrementarContador()
+    {
+        contador++;
+        Console.WriteLine($"✅ Contador incrementado a: {contador}");
+    }
+
+    private async Task ProbarAPI()
+    {
+        resultadoAPI = "⏳ Consultando...";
+
+        try
+        {
+            Console.WriteLine($"🔗 Conectando a: {Http.BaseAddress}api/facturas");
+
+            var response = await Http.GetAsync("/api/facturas");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var facturas = await response.Content.ReadFromJsonAsync<List<Factura>>();
+                resultadoAPI = $"✅ CONEXIÓN EXITOSA!\n";
+                resultadoAPI += $"Status: {response.StatusCode}\n";
+                resultadoAPI += $"Facturas encontradas: {facturas?.Count ?? 0}";
+
+                Console.WriteLine($"✅ API respondió correctamente");
+            }
+            else
+            {
+                resultadoAPI = $"❌ Error: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            resultadoAPI = $"❌ ERROR:\n{ex.Message}";
+            Console.WriteLine($"❌ Exception: {ex}");
+        }
+    }
+}

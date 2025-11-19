@@ -1,0 +1,205 @@
+﻿@page "/buscar"
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using FacturasCyber.Models
+
+<PageTitle>Buscar Factura</PageTitle>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-error" : "alert-success")">
+        @mensaje
+    </div>
+}
+
+<div class="form-section">
+    <h2>🔍 Buscar Factura por Nombre</h2>
+
+    <div class="search-container">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Nombre del Cliente:</label>
+            <input type="text"
+                   @bind="nombreCliente"
+                   placeholder="Ingrese el nombre del cliente"
+                   @onkeypress="HandleKeyPress" />
+        </div>
+        <button @onclick="BuscarPorNombre" disabled="@buscando" style="align-self: flex-end;">
+            @if (buscando)
+            {
+                <span>🔍 Buscando...</span>
+            }
+            else
+            {
+                <span>🔍 Buscar</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (facturasEncontradas.Any())
+{
+    <div class="facturas-lista">
+        <h2 style="color: #c41e3a; margin-bottom: 20px;">
+            Resultados de Búsqueda (@facturasEncontradas.Count factura(s))
+        </h2>
+
+        @foreach (var factura in facturasEncontradas)
+        {
+            <div class="factura-item @(facturaSeleccionada?.Id == factura.Id ? "selected" : "")"
+                 @onclick="() => SeleccionarFactura(factura)">
+
+                <strong style="color: #c41e3a;">@factura.NumeroFactura</strong> - @factura.Cliente
+                <span style="float: right; color: #ff6b35; font-weight: bold;">
+                    $@factura.Total.ToString("N2")
+                </span>
+                <br>
+                <small style="color: #999;">@factura.Fecha.ToString("dd/MM/yyyy HH:mm")</small>
+            </div>
+        }
+    </div>
+}
+else if (!string.IsNullOrEmpty(nombreCliente) && !buscando)
+{
+    <div class="alert alert-info">
+        ℹ️ No se encontraron facturas con ese nombre de cliente
+    </div>
+}
+
+@if (facturaSeleccionada != null)
+{
+    <div class="tiquete">
+        <div class="tiquete-header">
+            <h2>FACTURA</h2>
+            <p>@facturaSeleccionada.NumeroFactura</p>
+        </div>
+        <div class="tiquete-body">
+            <div class="tiquete-info">
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">ID:</span>
+                    <span>@facturaSeleccionada.Id</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Fecha:</span>
+                    <span>@facturaSeleccionada.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Cliente:</span>
+                    <span>@facturaSeleccionada.Cliente</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">NIT:</span>
+                    <span>@(facturaSeleccionada.NIT ?? "N/A")</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Dirección:</span>
+                    <span>@(facturaSeleccionada.Direccion ?? "N/A")</span>
+                </div>
+                <div class="tiquete-info-row">
+                    <span class="tiquete-info-label">Estado:</span>
+                    <span style="color: #28a745; font-weight: bold;">@facturaSeleccionada.Estado</span>
+                </div>
+            </div>
+
+            <h3 style="color: #c41e3a; margin: 20px 0 10px 0;">📦 Productos</h3>
+            <div class="tiquete-items">
+                @foreach (var detalle in facturaSeleccionada.Detalles)
+                {
+                    <div class="tiquete-item">
+                        <span class="item-name">@detalle.Producto</span>
+                        <span class="item-qty">x@detalle.Cantidad</span>
+                        <span class="item-price">$@detalle.Subtotal.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+
+            <div class="tiquete-totales">
+                <div class="tiquete-total-row">
+                    <span>Subtotal:</span>
+                    <span>$@facturaSeleccionada.Subtotal.ToString("N2")</span>
+                </div>
+                <div class="tiquete-total-row">
+                    <span>IVA (19%):</span>
+                    <span>$@facturaSeleccionada.IVA.ToString("N2")</span>
+                </div>
+                <div class="tiquete-total-row total">
+                    <span>TOTAL:</span>
+                    <span>$@facturaSeleccionada.Total.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+        <div class="tiquete-footer">
+            <p>¡Gracias por su compra!</p>
+            <p>Este documento es válido como factura</p>
+        </div>
+    </div>
+}
+
+@code {
+    private string nombreCliente = "";
+    private bool buscando = false;
+    private string mensaje = "";
+    private bool esError = false;
+
+    private List<Factura> facturasEncontradas = new();
+    private Factura? facturaSeleccionada = null;
+
+    private async Task BuscarPorNombre()
+    {
+        mensaje = "";
+
+        if (string.IsNullOrWhiteSpace(nombreCliente))
+        {
+            mensaje = "⚠️ Ingrese un nombre para buscar";
+            esError = true;
+            return;
+        }
+
+        buscando = true;
+        facturasEncontradas.Clear();
+        facturaSeleccionada = null;
+
+        try
+        {
+            var response = await Http.GetAsync($"/api/facturas/buscar?cliente={nombreCliente}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                facturasEncontradas = await response.Content.ReadFromJsonAsync<List<Factura>>() ?? new();
+
+                if (!facturasEncontradas.Any())
+                {
+                    mensaje = "ℹ️ No se encontraron facturas con ese nombre";
+                    esError = false;
+                }
+            }
+            else
+            {
+                mensaje = $"❌ Error al buscar: {response.StatusCode}";
+                esError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"❌ Error: {ex.Message}";
+            esError = true;
+        }
+        finally
+        {
+            buscando = false;
+        }
+    }
+
+    private void SeleccionarFactura(Factura factura)
+    {
+        facturaSeleccionada = factura;
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !buscando)
+        {
+            await BuscarPorNombre();
+        }
+    }
+}
