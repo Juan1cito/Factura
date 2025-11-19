@@ -385,13 +385,12 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 
 ## 👤 Autor
 
-**Johan Reyes**
-- GitHub: [@tu-usuario](https://github.com/tu-usuario)
-- Email: tu-email@example.com
+**Pablo Reyes**
+- GitHub: [@pablo2240](https://github.com/pablo2240)
+- Email: reyestorrespablo22@gmail.com
 
 ## 🙏 Agradecimientos
 
-- Diseño inspirado en estética Cyberpunk
 - Comunidad de Blazor y .NET
 - Tipografías de Google Fonts (Orbitron, Share Tech Mono)
 
@@ -400,4 +399,4 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ⭐ Si te gustó este proyecto, dale una estrella en GitHub!
 
 **Versión:** 1.0.0  
-**Última actualización:** Noviembre 2024
+**Última actualización:** Noviembre 2025
